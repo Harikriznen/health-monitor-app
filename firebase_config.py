@@ -22,13 +22,15 @@ private_key = os.environ.get("FIREBASE_PRIVATE_KEY")
 client_email = os.environ.get("FIREBASE_CLIENT_EMAIL", "firebase-adminsdk-pxbd3@newnod-4933c.iam.gserviceaccount.com")
 
 # Handle private key - convert escaped newlines to actual newlines
-# Handle multiple cases: \\n, \n, or actual newlines
 if private_key:
-    # First replace escaped backslash-n with actual newlines
+    # Replace escaped \n with actual newlines
     private_key = private_key.replace('\\n', '\n')
-    # Then replace any remaining literal \n with actual newlines
-    private_key = private_key.replace('\n', '\n')
+    # Also handle the case where \n is literally in the string as two characters
+    if '\\n' in private_key:
+        private_key = private_key.replace('\\n', '\n')
     logger.info("Private key successfully loaded from environment")
+else:
+    logger.warning("FIREBASE_PRIVATE_KEY is not set!")
 
 firebase_config = {
 	"type": "service_account",
@@ -43,3 +45,7 @@ firebase_config = {
 	"client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40').replace('.', '%2E')}@%40{project_id}.iam.gserviceaccount.com",
 	"universe_domain": "googleapis.com"
 }
+
+# Debug: Log the first few chars of private key to verify it's loaded
+if private_key:
+    logger.info(f"Private key starts with: {private_key[:50]}")
