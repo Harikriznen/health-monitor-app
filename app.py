@@ -34,11 +34,8 @@ def init_firebase():
             logger.error(f"Firebase initialization error: {e}")
             raise
 
-# Initialize Firebase on startup
-try:
-    init_firebase()
-except Exception as e:
-    logger.error(f"Failed to initialize Firebase: {e}")
+# Do NOT initialize Firebase at startup - it will be initialized on first request
+# This allows the app to start even if Firebase config is missing
 
 login_manager = LoginManager()
 login_manager.init_app(app)
