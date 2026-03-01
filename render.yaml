@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: health-monitor-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+    repo: https://github.com/Harikriznen/health-monitor-app
