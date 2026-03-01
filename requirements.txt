@@ -1,0 +1,8 @@
+Flask
+firebase-admin
+Flask-Login
+Flask-WTF
+WTForms
+python-dotenv
+requests
+gunicorn
