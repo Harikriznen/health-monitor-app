@@ -1,19 +1,44 @@
 import os
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+import logging
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, UserMixin, current_user
 from firebase_admin import credentials, firestore, initialize_app
 from werkzeug.security import generate_password_hash, check_password_hash
 import firebase_admin
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'devsecret')
 
-from firebase_config import firebase_config
-# Firebase setup
-cred = credentials.Certificate(firebase_config)
-if not firebase_admin._apps:
-    default_app = initialize_app(cred)
-db = firestore.client()
+# Get port from environment (Render provides this)
+port = int(os.environ.get('PORT', 5000))
+
+# Initialize Firebase lazily
+db = None
+
+def init_firebase():
+    global db
+    if db is None:
+        try:
+            from firebase_config import firebase_config
+            # Check if Firebase is already initialized
+            if not firebase_admin._apps:
+                cred = credentials.Certificate(firebase_config)
+                default_app = initialize_app(cred)
+                logger.info("Firebase initialized successfully")
+            db = firestore.client()
+        except Exception as e:
+            logger.error(f"Firebase initialization error: {e}")
+            raise
+
+# Initialize Firebase on startup
+try:
+    init_firebase()
+except Exception as e:
+    logger.error(f"Failed to initialize Firebase: {e}")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -27,6 +52,8 @@ class User(UserMixin):
 
     @staticmethod
     def get(user_id):
+        if db is None:
+            init_firebase()
         user_ref = db.collection('users').document(user_id).get()
         if user_ref.exists:
             data = user_ref.to_dict()
@@ -40,6 +67,8 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def dashboard():
+    if db is None:
+        init_firebase()
     metrics_ref = db.collection('metrics').document(current_user.id).get()
     metrics = metrics_ref.to_dict() if metrics_ref.exists else {}
     return render_template('dashboard.html', metrics=metrics)
@@ -47,6 +76,8 @@ def dashboard():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        if db is None:
+            init_firebase()
         email = request.form['email']
         password = request.form['password']
         users = db.collection('users').where(filter=('email', '==', email)).get()
@@ -62,6 +93,8 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        if db is None:
+            init_firebase()
         email = request.form['email']
         password = request.form['password']
         users = db.collection('users').where(filter=('email', '==', email)).get()
@@ -90,6 +123,8 @@ def favicon():
 @app.route('/api/metrics', methods=['POST'])
 @login_required
 def api_metrics():
+    if db is None:
+        init_firebase()
     if not request.is_json:
         return {'error': 'JSON required'}, 400
     data = request.get_json()
@@ -99,5 +134,9 @@ def api_metrics():
     db.collection('metrics').document(current_user.id).set(metrics)
     return {'status': 'success'}
 
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok'})
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
